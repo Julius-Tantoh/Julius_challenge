@@ -1,0 +1,58 @@
+- hosts: all
+  remote_user: ec2-user
+  become: yes
+  become_method: sudo
+  tasks: 
+    - name: install nginx 
+      yum:
+        name: nginx 
+        state: latest
+      tags:
+         - nginx
+    
+    - name: create folder for ssl certificate
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /etc/ssl
+        - /var/www
+        - /var/www/html
+    
+    - name: copy cert file to SSL folder
+      copy: 
+        src: "{{ item }}"
+        dest: "/etc/ssl/{{ item }}"
+      loop:
+        - nginx-selfsigned.crt
+        - nginx-selfsigned.key
+        - dhparam.pem
+
+    - name: copy static file
+      copy: 
+        src: "index.html"
+        dest: "/var/www/html/index.html"
+      
+    - name: get system ip
+      set_fact:
+         server_ip: "{{ ansible_default_ipv4.address }}"
+      tags:
+         - nginx
+         
+    - name: Setup nginx vhost
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/conf.d/web.conf
+      tags:
+         - nginx
+
+    - name: start nginx
+      service: 
+        name: nginx
+        state: restarted
+        enabled: yes
+      tags:
+         - nginx
+      
+      
